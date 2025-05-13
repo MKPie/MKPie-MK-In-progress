@@ -1,0 +1,16 @@
+{
+    "api_manager_plugin": {
+        "enabled": true,
+        "show_in_ui": true,
+        "name": "API Manager",
+        "description": "Manage API integrations for product data retrieval",
+        "version": "1.0.0"
+    },
+    "example_plugin": {
+        "enabled": true,
+        "show_in_ui": true,
+        "name": "Example Plugin",
+        "description": "Demonstrates plugin functionality with enable/disable and show/hide support",
+        "version": "1.0.0"
+    }
+}

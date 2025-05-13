@@ -1,0 +1,16 @@
+{
+    "api_manager_plugin": {
+        "enabled": true,
+        "show_in_ui": true,
+        "name": "API Manager",
+        "description": "Manage API integrations for product data retrieval",
+        "version": "1.0.0"
+    },
+    "field_selector_plugin": {
+        "enabled": true,
+        "show_in_ui": true,
+        "name": "Field Selector",
+        "description": "Select and customize fields to extract from web pages",
+        "version": "1.0.0"
+    }
+}
