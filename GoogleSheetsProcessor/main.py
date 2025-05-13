@@ -811,6 +811,13 @@ class SheetRow(QFrame):
             for i in range(1, 6):  # Video Link 1, Video Link 2, etc.
                 columns.append(f"Video Link {i}")
             
+            # Add image link columns (main image and additional images)
+            columns.append("Main Image")
+            for i in range(1, 6):  # Additional Image 1, Additional Image 2, etc.
+                columns.append(f"Additional Image {i}")
+            
+            print(f"Output columns: {columns}")
+            
             # Initialize output DataFrame with all columns
             self.output_df = pd.DataFrame(columns=columns)
             
@@ -890,6 +897,13 @@ class SheetRow(QFrame):
                             if i <= 5:  # Ensure we don't exceed our column limit
                                 row_data[f"Video Link {i}"] = ""
                         
+                        # Add main image and additional images (placeholder logic)
+                        # In a real implementation, you would extract these from the page
+                        # For now, setting Main Image to a placeholder
+                        row_data["Main Image"] = ""
+                        for i in range(1, 6):
+                            row_data[f"Additional Image {i}"] = ""
+                        
                         # Add to results DataFrame
                         new_row = pd.DataFrame([row_data])
                         self.output_df = pd.concat([self.output_df, new_row], ignore_index=True)
@@ -946,15 +960,26 @@ class SheetRow(QFrame):
                 # Ensure the output directory exists
                 os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
                 
+                # Debug output
+                print(f"Saving output file to: {self.output_path}")
+                print(f"DataFrame shape: {self.output_df.shape}")
+                print(f"DataFrame columns: {self.output_df.columns.tolist()}")
+                
+                # Check if the DataFrame has any rows
+                if len(self.output_df) == 0:
+                    print("WARNING: DataFrame is empty - no rows to save")
+                    self.signals.update_status.emit("No data to save - DataFrame is empty")
+                    return
+                
                 # First save using pandas to Excel
                 self.output_df.to_excel(self.output_path, index=False)
+                print(f"Successfully saved DataFrame to Excel: {self.output_path}")
                 
                 # Then open with openpyxl to adjust cell heights
                 workbook = openpyxl.load_workbook(self.output_path)
                 worksheet = workbook.active
                 
                 # Set default row height for all rows
-                # Standard default height in Excel is 15 points
                 for row in worksheet.iter_rows():
                     worksheet.row_dimensions[row[0].row].height = 15
                 
@@ -969,9 +994,15 @@ class SheetRow(QFrame):
                 workbook.save(self.output_path)
                 workbook.close()  # Explicitly close workbook to release file lock
                 
+                # Update status
+                self.signals.update_status.emit(f"Saved results to {os.path.basename(self.output_path)}")
+                print(f"Successfully formatted Excel file: {self.output_path}")
+                
             except Exception as e:
                 print(f"Error saving results: {e}")
-                print(traceback.format_exc())
+                import traceback
+                traceback.print_exc()
+                self.signals.update_status.emit(f"Error saving: {str(e)[:50]}...")
 
 
 class MainWindow(QWidget):
@@ -988,13 +1019,19 @@ class MainWindow(QWidget):
         # Set up the UI
         self.setup_ui()
         
-        # Load plugins
+        # Load plugins with better error handling
         try:
             from load_plugins import load_plugins
-            load_plugins(self)
+            self.plugin_manager = load_plugins(self)
+            
+            # Manually ensure field selector configuration has image fields enabled
+            self.update_field_selector_config()
+            
             print("Plugins loaded successfully")
         except Exception as e:
             print(f"Error loading plugins: {e}")
+            import traceback
+            traceback.print_exc()
         
         # Add initial row
         self.add_row()
@@ -1002,6 +1039,47 @@ class MainWindow(QWidget):
         # For sequential processing
         self.processing_queue = []
         self.current_processing_index = -1
+    
+    def update_field_selector_config(self):
+        """Ensure field selector has image fields enabled"""
+        try:
+            import os
+            import json
+            
+            # Path to field selector config
+            config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
+                                      "plugins", "field_selector_config.json")
+            
+            # Load existing config
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+            else:
+                config = {"selected_fields": {}}
+            
+            # Ensure selected_fields exists
+            if "selected_fields" not in config:
+                config["selected_fields"] = {}
+                
+            # Enable essential fields including images
+            essential_fields = [
+                "title", "description", "model", "manufacturer", 
+                "weight", "dimensions", "price", "sku",
+                "main_image", "additional_images", "video_links"
+            ]
+            
+            for field in essential_fields:
+                config["selected_fields"][field] = True
+            
+            # Save updated config
+            with open(config_path, 'w') as f:
+                json.dump(config, f, indent=4)
+            
+            print(f"Updated field_selector_config.json to enable essential fields")
+        except Exception as e:
+            print(f"Error updating field selector config: {e}")
+            import traceback
+            traceback.print_exc()
     
     def authenticate_google_drive(self):
         """Connect to Google Drive API"""
@@ -1218,7 +1296,8 @@ class MainWindow(QWidget):
                 print("WebScraper Wrapper not found, using standard row")
             except Exception as e:
                 print(f"Error enhancing row: {e}")
-                print(traceback.format_exc())
+                import traceback
+                traceback.print_exc()
             
             # Force UI update before adding it
             QApplication.processEvents()
@@ -1237,7 +1316,8 @@ class MainWindow(QWidget):
             QTimer.singleShot(500, self.refresh_all_rows)
         except Exception as e:
             print(f"Error adding row: {e}")
-            print(traceback.format_exc())
+            import traceback
+            traceback.print_exc()
             QMessageBox.warning(self, "Error", f"Error adding new row: {str(e)}")
     
     def refresh_all_rows(self):
